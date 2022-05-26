@@ -388,7 +388,7 @@ paddleflow run create -yr {{base64yaml}}
 用户可以先创建工作流模板，具体方法见下文的工作流模板相关内容，然后通过工作流模板的ID，来发起任务，具体如下：
 
 ```bash
-paddleflow run create -pplid ppl-000001
+paddleflow run create -pplid ppl-000666
 ```
 
 工作流列表：用户输入```paddleflow run list```，界面上能够显示出所有工作流列表信息,marker下一页的起始位，-mk --marker 参数使用
