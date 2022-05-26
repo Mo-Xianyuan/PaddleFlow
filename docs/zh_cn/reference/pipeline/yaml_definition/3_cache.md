@@ -84,7 +84,7 @@ cache:
   fs_scope: cache_example/shells/train.sh,cache_example/shells/validate.sh,cache_example/shells/data_artifact.sh
   max_expired_time: 600
 
-docker_env: registry.baidubce.com/pipeline/nginx:1.7.9
+docker_env: nginx:1.7.9
 ```
 
 # 2 cache参数详解
