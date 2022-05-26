@@ -297,24 +297,98 @@ mount命令：用户输入```paddleflow fs mount {fs_name} {mountpath}```，界�
 `run` 提供了`create`, `list`, `status`, `stop`, `retry`, `delete`, `listcache`, `showcache`, `delcache`, `artifact`十种不同的方法。 十种不同操作的示例如下：
 
 ```bash
-paddleflow run create -fs(--fsname) fs_name -n(--name) run_name  -d(--desc) xxx -u(--username) username -p(--param) data_file=xxx -p regularization=*** -yp(--runyamlpath) ./run.yaml -pplid(--pipelineid) ppl-000666 -yr(runyamlraw) xxx --disabled some_step_names -de(--dockerenv) docker_env // 创建pipeline作业，-yp、-pplid、yr为3中发起任务的方式，每次只能使用其中一种
-paddleflow run list -f(--fsname) fsname -u(--username) username -r(--runid) runid -n(--name) name -m(--maxsize) 10 -mk(--marker) xxx//列出所有运行的pipeline （通过fsname 列出特定fs下面的pipeline；通过username 列出特定用户的pipeline（限root用户）;通过runid列出特定runid的pipeline; 通过name列出特定name的pipeline）
+paddleflow run create -f(--fsname) fs_name -n(--name) run_name  -d(--desc) xxx -u(--username) username -p(--param) data_file=xxx -p regularization=*** -yp(--runyamlpath) ./run.yaml -pplid(--pipelineid) ppl-000666 -yr(runyamlraw) xxx --disabled some_step_names -de(--dockerenv) docker_env // 创建pipeline作业，-yp、-pplid、yr为3中发起任务的方式，每次只能使用其中一种
+paddleflow run list -f(--fsname) fsname -u(--username) username -r(--runid) runid -n(--name) name -m(--maxsize) 10 -mk(--marker) xxx // 列出所有运行的pipeline （通过fsname 列出特定fs下面的pipeline；通过username 列出特定用户的pipeline（限root用户）;通过runid列出特定runid的pipeline; 通过name列出特定name的pipeline）
 paddleflow run status runid // 展示一个pipeline下面的详细信息，包括job信息列表
 paddleflow run stop runid -f(--force) //停止一个pipeline
 paddleflow run retry runid // 重跑一个pipeline
-paddleflow run delete runid //删除一个运行的工作流
-paddleflow run listcache -u(--userfilter) username -f(--fsfilter) fsname -r(--runfilter) run-000666 -m(--maxsize) 10 -mk(--marker) xxx //列出搜有的工作流缓存
-paddleflow run showcache cacheid //显示工作流缓存详情
-paddleflow run delcahce cacheid //删除指定工作流缓存
-paddleflow run artifact -u(--userfilter) username -f(--fsfilter) fsname -r(runfilter) run-000666 -t(--typefilter) type -p(--pathfilter) path -m(--maxsize) 10 -mk(--marker) xxx //列出所有工作流产出
+paddleflow run delete runid // 删除一个运行的工作流
+paddleflow run listcache -u(--userfilter) username -f(--fsfilter) fsname -r(--runfilter) run-000666 -m(--maxsize) 10 -mk(--marker) xxx // 列出搜有的工作流缓存
+paddleflow run showcache cacheid // 显示工作流缓存详情
+paddleflow run delcahce cacheid // 删除指定工作流缓存
+paddleflow run artifact -u(--userfilter) username -f(--fsfilter) fsname -r(runfilter) run-000666 -t(--typefilter) type -p(--pathfilter) path -m(--maxsize) 10 -mk(--marker) xxx // 列出所有工作流产出
 ```
 
 ### 示例
 
-创建工作流：用户输入```paddleflow run create -fs {fs_name} -n {run_name} -d {main} -yp {yaml_path}```发起一次run任务，界面上能够返回对应的```runid```信息。
+创建工作流：用户输入```paddleflow run create -f {fs_name} -n {run_name} -d {main} -yp {yaml_path}```发起一次pipeline任务，界面上能够返回对应的```runid```信息。
 
 ```bash
 run[{run_name}] create success with runid[{runid}]
+```
+
+> 由于创建工作流功能较为复杂，下面对该功能展开讲解
+
+参数介绍：
+
+|参数名称 | 是否必填 | 参数含义
+|:---:|:---:|:---|
+|-f --fsname | optional | 存储名称
+|-n --name | optional | 任务名称
+|-d --desc | optional | 任务描述
+|-u --username | optional | 用户名，仅当登录用户为root时可以填写
+|-p --param | optional | 用于进行参数替换
+|--disabled | opitonal | 用于指定不需要运行的节点
+|-de --dockerenv| optional | 用于指定全局DockerEnv，可以为镜像的url或镜像tar包在fs的路径
+|-yp --runyamlpath | optional | 任务发起方式之一，fs下yaml文件的路径
+|-yr --runyamlraw | optional | 任务发起方式之一，base64编码的yaml文件内容
+|-pplid --pipelineid | opitonal | 任务发起方式之一，工作流模板的ID，如何创建工作流模板请查看后文工作流模板的相关内容
+
+创建工作流的三种方法示例：
+
+1. runyamlpath：
+
+```bash
+paddleflow run create -f testfs -yp ./run.yaml
+```
+
+上面的命令中，-f 和 -yp 都是必须要填写的参数。
+
+run.yaml的内容如下，其中大括号中的内容需要用户进一步填写：
+
+```yaml
+name: myproject
+
+docker_env: "{{your_iamge_url}}"
+
+entry_points:
+  step1:
+    command: "echo 111"
+    env:
+      PF_JOB_QUEUE_NAME: "{{your_queue_name}}"
+      PF_JOB_TYPE: vcjob
+      PF_JOB_MODE: Pod
+      PF_JOB_FLAVOUR: flavour1
+      PF_JOB_PRIORITY: HIGH
+  step2:
+    deps: step1
+    command: "echo 222"
+    env:
+      PF_JOB_QUEUE_NAME: "{{your_queue_name}}"
+      PF_JOB_TYPE: vcjob
+      PF_JOB_MODE: Pod
+      PF_JOB_FLAVOUR: flavour1
+      PF_JOB_PRIORITY: HIGH
+```
+
+2. runyamlraw:
+
+用户可以自行将yaml文件的内容进行base64转码，然后通过如下命令发起任务：
+
+```bash
+paddleflow run create -yr {{base64yaml}}
+```
+
+其中 {{base64yaml}} 为将yaml文件的内容进行base64转码后的结果。
+
+> 需要注意的是，如果使用这种方法，或者下面马上要介绍的pipelineid方法，-f 就不是必须的了，但依赖fs的功能则无法使用，如 Artifact。
+
+3. pipelineid:
+
+用户可以先创建工作流模板，具体方法见下文的工作流模板相关内容，然后通过工作流模板的ID，来发起任务，具体如下：
+
+```bash
+paddleflow run create -pplid ppl-000001
 ```
 
 工作流列表：用户输入```paddleflow run list```，界面上能够显示出所有工作流列表信息,marker下一页的起始位，-mk --marker 参数使用
@@ -444,10 +518,10 @@ marker: f990bc858cbd2a8d5eae9243970a2d8c
 `pipeline` 提供了`create`,`show`, `list`, `delete`四种不同的方法。 四种不同操作的示例如下：
 
 ```bash
-paddleflow pipeline create  fsname:required（必须） yamlpath:required(必须)  -n(--name)  pipeline_name -u(--username) username    // 创建pipeline模板(指定创建的pipeline模板名称；指定模板的用户)
-paddleflow pipeline list -u(--userfilter) user -f(--fsfilter) fsname -n(--namefilter) pipeline_name -m(--maxkeys) int -mk(--marker) xxx//列出所有的pipeline模板 （通过username 列出特定用户的pipeline模板（限root用户）;通过fsname 列出特定fs下面的pipeline模板；通过pipelinename列出特定的pipeline模板；列出指定数量的pipeline模板；从marker列出pipeline模板）
+paddleflow pipeline create  fsname:required（必须） yamlpath:required(必须)  -n(--name)  pipeline_name -u(--username) username // 创建pipeline模板(指定创建的pipeline模板名称；指定模板的用户)
+paddleflow pipeline list -u(--userfilter) user -f(--fsfilter) fsname -n(--namefilter) pipeline_name -m(--maxkeys) int -mk(--marker) xxx // 列出所有的pipeline模板 （通过username 列出特定用户的pipeline模板（限root用户）;通过fsname 列出特定fs下面的pipeline模板；通过pipelinename列出特定的pipeline模板；列出指定数量的pipeline模板；从marker列出pipeline模板）
 paddleflow pipeline show pipelineid // 展示一个pipeline模板下面的详细信息，包括yaml信息
-paddleflow pipeline delete  pipelineid  //删除一个pipeline模板 
+paddleflow pipeline delete  pipelineid // 删除一个pipeline模板 
 
 ```
 
