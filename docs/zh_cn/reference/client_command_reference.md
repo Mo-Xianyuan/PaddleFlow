@@ -300,7 +300,7 @@ mount命令：用户输入```paddleflow fs mount {fs_name} {mountpath}```，界�
 paddleflow run create -f(--fsname) fs_name -n(--name) run_name  -d(--desc) xxx -u(--username) username -p(--param) data_file=xxx -p regularization=*** -yp(--runyamlpath) ./run.yaml -pplid(--pipelineid) ppl-000666 -yr(runyamlraw) xxx --disabled some_step_names -de(--dockerenv) docker_env // 创建pipeline作业，-yp、-pplid、yr为3中发起任务的方式，每次只能使用其中一种
 paddleflow run list -f(--fsname) fsname -u(--username) username -r(--runid) runid -n(--name) name -m(--maxsize) 10 -mk(--marker) xxx // 列出所有运行的pipeline （通过fsname 列出特定fs下面的pipeline；通过username 列出特定用户的pipeline（限root用户）;通过runid列出特定runid的pipeline; 通过name列出特定name的pipeline）
 paddleflow run status runid // 展示一个pipeline下面的详细信息，包括job信息列表
-paddleflow run stop runid -f(--force) //停止一个pipeline
+paddleflow run stop runid -f(--force) // 停止一个pipeline
 paddleflow run retry runid // 重跑一个pipeline
 paddleflow run delete runid // 删除一个运行的工作流
 paddleflow run listcache -u(--userfilter) username -f(--fsfilter) fsname -r(--runfilter) run-000666 -m(--maxsize) 10 -mk(--marker) xxx // 列出搜有的工作流缓存
@@ -334,6 +334,8 @@ run[{run_name}] create success with runid[{runid}]
 |-yr --runyamlraw | optional | 任务发起方式之一，base64编码的yaml文件内容
 |-pplid --pipelineid | opitonal | 任务发起方式之一，工作流模板的ID，如何创建工作流模板请查看后文工作流模板的相关内容
 
+创建工作流至少需要提供1个参数，且必须是 -yp/-yr/-pplid 中的一个，这个参数用来指定创建工作刘的方法，而对于-yp对应的方法，还必须再指定 -f 参数。其他参数则均为选填。
+
 创建工作流的三种方法示例：
 
 1. runyamlpath：
@@ -344,31 +346,55 @@ paddleflow run create -f testfs -yp ./run.yaml
 
 上面的命令中，-f 和 -yp 都是必须要填写的参数。
 
-run.yaml的内容如下，其中大括号中的内容需要用户进一步填写：
+下面给出一个run.yaml的内容示例：
+
+> 该示例中pipeline定义，以及示例相关运行脚本，来自Paddleflow项目下example/pipeline/base_pipeline示例。
+> 
+> 示例链接：[base_pipeline][base_pipeline]
 
 ```yaml
-name: myproject
-
-docker_env: "{{your_iamge_url}}"
+name: base_pipeline
 
 entry_points:
-  step1:
-    command: "echo 111"
+  preprocess:
+    command: bash base_pipeline/shells/data.sh {{data_path}}
+    docker_env: kfp_mysql:1.7.0
     env:
-      PF_JOB_QUEUE_NAME: "{{your_queue_name}}"
-      PF_JOB_TYPE: vcjob
-      PF_JOB_MODE: Pod
       PF_JOB_FLAVOUR: flavour1
-      PF_JOB_PRIORITY: HIGH
-  step2:
-    deps: step1
-    command: "echo 222"
+      PF_JOB_MODE: Pod
+      PF_JOB_QUEUE_NAME: ppl-queue
+      PF_JOB_TYPE: vcjob
+      USER_ABC: 123_{{PF_USER_NAME}}
+    parameters:
+      data_path: ./base_pipeline/data/{{PF_RUN_ID}}
+
+  train:
+    command: bash base_pipeline/shells/train.sh {{epoch}} {{train_data}} {{model_path}}
+    deps: preprocess
     env:
-      PF_JOB_QUEUE_NAME: "{{your_queue_name}}"
-      PF_JOB_TYPE: vcjob
-      PF_JOB_MODE: Pod
       PF_JOB_FLAVOUR: flavour1
-      PF_JOB_PRIORITY: HIGH
+      PF_JOB_MODE: Pod
+      PF_JOB_QUEUE_NAME: ppl-queue
+      PF_JOB_TYPE: vcjob
+    parameters:
+      epoch: 5
+      model_path: ./output/{{PF_RUN_ID}}
+      train_data: '{{preprocess.data_path}}'
+
+  validate:
+    command: bash base_pipeline/shells/validate.sh {{model_path}}
+    deps: train
+    env:
+      PF_JOB_FLAVOUR: flavour1
+      PF_JOB_MODE: Pod
+      PF_JOB_QUEUE_NAME: ppl-queue
+      PF_JOB_TYPE: vcjob
+    parameters:
+      model_path: '{{train.model_path}}'
+
+parallelism: 1
+
+docker_env: nginx:1.7.9
 ```
 
 2. runyamlraw:
@@ -385,7 +411,7 @@ paddleflow run create -yr {{base64yaml}}
 
 3. pipelineid:
 
-用户可以先创建工作流模板，具体方法见下文的工作流模板相关内容，然后通过工作流模板的ID，来发起任务，具体如下：
+用户可以先创建工作流模板，具体方法见下文的[工作流模板管理](#工作流模板管理)相关内容，然后通过工作流模板的ID，来发起任务，具体如下：
 
 ```bash
 paddleflow run create -pplid ppl-000666
@@ -751,3 +777,5 @@ paddleflow log show runid -j(--jobid) jobid -ps(--pagesize) pagesize -pn(--pagen
 +------------+------------------------------+------------------------------------------------+-----------------+-------------+-----------+-------------+-------------------------------------------------------------------------------------------------------------+
 
 ```
+
+[base_pipeline]: /example/pipeline/base_pipeline
